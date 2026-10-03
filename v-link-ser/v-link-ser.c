@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
+#include <linux/bitfield.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/gpio/consumer.h>
@@ -10,6 +11,7 @@
 #include <linux/of.h>
 #include <linux/of_graph.h>
 #include <linux/regmap.h>
+#include <linux/version.h>
 
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
@@ -455,7 +457,12 @@ static int v_link_ser_probe(struct i2c_client *client) {
   return ret;
 }
 
+/* i2c remove() returns void since v6.1 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+static void v_link_ser_remove(struct i2c_client *client) {
+#else
 static int v_link_ser_remove(struct i2c_client *client) {
+#endif
   struct v_link_ser_priv *priv =
 		sd_to_v_link(i2c_get_clientdata(client));
   
@@ -463,8 +470,10 @@ static int v_link_ser_remove(struct i2c_client *client) {
 	media_entity_cleanup(&priv->sd.entity);
 	v4l2_ctrl_handler_free(&priv->ctrls);
   i2c_mux_del_adapters(priv->mux);
-  
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
   return 0;
+#endif
 }
 
 static const struct of_device_id v_link_ser_dt_ids[] = {
@@ -479,7 +488,12 @@ static struct i2c_driver v_link_ser_i2c_driver = {
             .name = "v-link-ser",
             .of_match_table = of_match_ptr(v_link_ser_dt_ids),
         },
+/* single-argument probe is .probe since v6.3; .probe_new was removed later */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+    .probe = v_link_ser_probe,
+#else
     .probe_new = v_link_ser_probe,
+#endif
     .remove = v_link_ser_remove,
 };
 
